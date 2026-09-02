@@ -8,38 +8,46 @@ function App() {
   const [error, setError] = useState("");
 
   const searchBooks = async () => {
-    if (!query.trim()) {
-      setError("Please enter a book name.");
-      return;
+  if (!query.trim()) {
+    setError("Please enter a book name.");
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+  setBooks([]);
+
+  try {
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+      query.trim()
+    )}&maxResults=20`;
+
+    console.log("Fetching:", url);
+
+    const response = await fetch(url);
+
+    console.log("Status:", response.status);
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
     }
 
-    setLoading(true);
-    setError("");
+    const data = await response.json();
 
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-          query
-        )}&maxResults=20`
-      );
+    console.log("API Response:", data);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch books");
-      }
-
-      const data = await response.json();
-      setBooks(data.items || []);
-
-      if (!data.items || data.items.length === 0) {
-        setError("No books found.");
-      }
-    } catch (err) {
-      setError("Something went wrong. Please try again.");
-      setBooks([]);
-    } finally {
-      setLoading(false);
+    if (data.items && data.items.length > 0) {
+      setBooks(data.items);
+    } else {
+      setError("No books found.");
     }
-  };
+  } catch (err) {
+    console.error("Book search error:", err);
+    setError(`Something went wrong: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
