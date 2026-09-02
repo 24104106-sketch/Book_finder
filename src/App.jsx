@@ -8,10 +8,11 @@ function App() {
   const [error, setError] = useState("");
 
   const searchBooks = async () => {
-    const search = query.trim();
+    const searchQuery = query.trim();
 
-    if (!search) {
+    if (!searchQuery) {
       setError("Please enter a book name.");
+      setBooks([]);
       return;
     }
 
@@ -19,21 +20,20 @@ function App() {
 
     setLoading(true);
     setError("");
+    setBooks([]);
 
     try {
+      // Open Library API - No API key required
       const url =
-        `https://www.googleapis.com/books/v1/volumes` +
-        `?q=${encodeURIComponent(search)}` +
-        `&maxResults=10`;
+        `https://openlibrary.org/search.json` +
+        `?q=${encodeURIComponent(searchQuery)}` +
+        `&limit=20`;
+
+      console.log("Fetching:", url);
 
       const response = await fetch(url);
 
-      if (response.status === 429) {
-        setError(
-          "Google Books is temporarily rate-limiting requests. Please wait 1–2 minutes and try again."
-        );
-        return;
-      }
+      console.log("Status:", response.status);
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
@@ -41,17 +41,18 @@ function App() {
 
       const data = await response.json();
 
-      if (data.items?.length) {
-        setBooks(data.items);
+      console.log("API Response:", data);
+
+      if (data.docs && data.docs.length > 0) {
+        setBooks(data.docs);
       } else {
-        setBooks([]);
         setError("No books found.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Book search error:", err);
 
       setError(
-        "Something went wrong. Please try again later."
+        "Something went wrong. Please try again."
       );
     } finally {
       setLoading(false);
@@ -66,11 +67,12 @@ function App() {
 
   return (
     <div className="app">
+      {/* Header */}
       <header className="header">
         <h1>📚 React Book Finder</h1>
 
         <p>
-          Search books without an API key
+          Search millions of books using Open Library
         </p>
 
         <div className="search-box">
@@ -94,86 +96,133 @@ function App() {
         </div>
       </header>
 
+      {/* Main */}
       <main className="container">
 
+        {/* Loading */}
         {loading && (
           <div className="message loading">
             🔍 Searching books...
           </div>
         )}
 
+        {/* Error */}
         {error && !loading && (
           <div className="message error">
             ⚠️ {error}
           </div>
         )}
 
+        {/* Results */}
         {!loading && books.length > 0 && (
           <>
-            <h2>Search Results</h2>
+            <h2>
+              Search Results ({books.length})
+            </h2>
 
             <div className="book-grid">
-              {books.map((book) => {
-                const info = book.volumeInfo || {};
+              {books.map((book, index) => {
+                // Open Library cover ID
+                const coverId = book.cover_i;
+
+                const coverUrl = coverId
+                  ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+                  : null;
+
+                // Authors
+                const authors = book.author_name
+                  ? book.author_name.join(", ")
+                  : "Unknown Author";
+
+                // First publish year
+                const year =
+                  book.first_publish_year || null;
+
+                // ISBN
+                const isbn =
+                  book.isbn?.[0] || null;
 
                 return (
                   <div
                     className="book-card"
-                    key={book.id}
+                    key={`${book.key}-${index}`}
                   >
+                    {/* Cover */}
                     <div className="cover">
-                      {info.imageLinks?.thumbnail ? (
+                      {coverUrl ? (
                         <img
-                          src={info.imageLinks.thumbnail.replace(
-                            "http://",
-                            "https://"
-                          )}
-                          alt={info.title}
+                          src={coverUrl}
+                          alt={
+                            book.title ||
+                            "Book cover"
+                          }
+                          loading="lazy"
                         />
                       ) : (
                         <div className="no-cover">
-                          📕
-                          <span>No Cover</span>
+                          <span>📕</span>
+                          <small>No Cover</small>
                         </div>
                       )}
                     </div>
 
+                    {/* Book Info */}
                     <div className="book-info">
+
                       <h3>
-                        {info.title || "Unknown Title"}
+                        {book.title ||
+                          "Unknown Title"}
                       </h3>
 
                       <p className="author">
-                        ✍️{" "}
-                        {info.authors
-                          ? info.authors.join(", ")
-                          : "Unknown Author"}
+                        ✍️ {authors}
                       </p>
 
-                      {info.publishedDate && (
+                      {year && (
                         <p className="date">
-                          📅 Published: {info.publishedDate}
+                          📅 First Published: {year}
                         </p>
                       )}
 
-                      {info.publisher && (
-                        <p className="publisher">
-                          🏢 {info.publisher}
+                      {book.edition_count && (
+                        <p className="edition">
+                          📖 Editions:{" "}
+                          {book.edition_count}
                         </p>
                       )}
 
-                      {info.description && (
-                        <p className="description">
-                          {info.description.length > 150
-                            ? info.description.substring(0, 150) +
-                              "..."
-                            : info.description}
+                      {isbn && (
+                        <p className="isbn">
+                          🔢 ISBN: {isbn}
                         </p>
                       )}
 
-                      {info.previewLink && (
+                      {/* Subjects */}
+                      {book.subject && (
+                        <div className="subjects">
+                          {book.subject
+                            .slice(0, 3)
+                            .map(
+                              (
+                                subject,
+                                subjectIndex
+                              ) => (
+                                <span
+                                  key={
+                                    subjectIndex
+                                  }
+                                >
+                                  {subject}
+                                </span>
+                              )
+                            )}
+                        </div>
+                      )}
+
+                      {/* Open Library Button */}
+                      {book.key && (
                         <a
-                          href={info.previewLink}
+                          href={`https://openlibrary.org${book.key}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="view-button"
@@ -189,6 +238,7 @@ function App() {
           </>
         )}
 
+        {/* Welcome */}
         {!loading &&
           !error &&
           books.length === 0 && (
@@ -197,11 +247,13 @@ function App() {
                 📚
               </div>
 
-              <h2>Find Your Next Book</h2>
+              <h2>
+                Find Your Next Book
+              </h2>
 
               <p>
-                Enter a title, author, or keyword
-                to search.
+                Search by title, author,
+                or keyword.
               </p>
             </div>
           )}
