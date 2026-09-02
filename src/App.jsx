@@ -8,125 +8,71 @@ function App() {
   const [error, setError] = useState("");
 
   const searchBooks = async () => {
-    // Empty search check
-    if (!query.trim()) {
+    const search = query.trim();
+
+    if (!search) {
       setError("Please enter a book name.");
-      setBooks([]);
       return;
     }
 
-    // Prevent multiple requests
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     setLoading(true);
     setError("");
-    setBooks([]);
 
     try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-        query.trim()
-      )}&maxResults=10`;
+      const url =
+        `https://www.googleapis.com/books/v1/volumes` +
+        `?q=${encodeURIComponent(search)}` +
+        `&maxResults=10`;
 
-      console.log("Fetching:", url);
+      const response = await fetch(url);
 
-      let response;
-
-      // Retry maximum 3 times if 429 occurs
-      for (let attempt = 0; attempt < 3; attempt++) {
-        response = await fetch(url);
-
-        console.log("Attempt:", attempt + 1);
-        console.log("Status:", response.status);
-
-        // If not 429, stop retrying
-        if (response.status !== 429) {
-          break;
-        }
-
-        // Wait before retry
-        if (attempt < 2) {
-          const delay = 2000 * (attempt + 1);
-
-          console.log(`Rate limited. Retrying in ${delay / 1000} seconds...`);
-
-          await new Promise((resolve) => {
-            setTimeout(resolve, delay);
-          });
-        }
+      if (response.status === 429) {
+        setError(
+          "Google Books is temporarily rate-limiting requests. Please wait 1–2 minutes and try again."
+        );
+        return;
       }
 
-      // Handle API errors
       if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error(
-            "Too many requests. Please wait a few seconds and try again."
-          );
-        }
-
-        if (response.status === 400) {
-          throw new Error("Invalid search request.");
-        }
-
-        if (response.status === 403) {
-          throw new Error(
-            "API access denied. Please check your Google Books API settings."
-          );
-        }
-
-        if (response.status === 404) {
-          throw new Error("Books API endpoint not found.");
-        }
-
-        if (response.status >= 500) {
-          throw new Error(
-            "Google Books server is temporarily unavailable."
-          );
-        }
-
         throw new Error(`API Error: ${response.status}`);
       }
 
       const data = await response.json();
 
-      console.log("API Response:", data);
-
-      // Check books
-      if (data.items && data.items.length > 0) {
+      if (data.items?.length) {
         setBooks(data.items);
       } else {
-        setError("No books found. Try another title or author.");
+        setBooks([]);
+        setError("No books found.");
       }
     } catch (err) {
-      console.error("Book search error:", err);
+      console.error(err);
 
       setError(
-        err.message || "Something went wrong. Please try again."
+        "Something went wrong. Please try again later."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // Enter key search
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !loading) {
+    if (e.key === "Enter") {
       searchBooks();
     }
   };
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
         <h1>📚 React Book Finder</h1>
 
         <p>
-          Search millions of books using Google Books
+          Search books without an API key
         </p>
 
-        {/* Search Box */}
         <div className="search-box">
           <input
             type="text"
@@ -134,11 +80,7 @@ function App() {
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-
-              // Clear error when user starts typing
-              if (error) {
-                setError("");
-              }
+              setError("");
             }}
             onKeyDown={handleKeyDown}
           />
@@ -152,23 +94,20 @@ function App() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="container">
-        {/* Loading */}
+
         {loading && (
           <div className="message loading">
-            🔍 Searching for books...
+            🔍 Searching books...
           </div>
         )}
 
-        {/* Error */}
         {error && !loading && (
           <div className="message error">
             ⚠️ {error}
           </div>
         )}
 
-        {/* Results */}
         {!loading && books.length > 0 && (
           <>
             <h2>Search Results</h2>
@@ -182,7 +121,6 @@ function App() {
                     className="book-card"
                     key={book.id}
                   >
-                    {/* Book Cover */}
                     <div className="cover">
                       {info.imageLinks?.thumbnail ? (
                         <img
@@ -190,7 +128,7 @@ function App() {
                             "http://",
                             "https://"
                           )}
-                          alt={info.title || "Book cover"}
+                          alt={info.title}
                         />
                       ) : (
                         <div className="no-cover">
@@ -200,7 +138,6 @@ function App() {
                       )}
                     </div>
 
-                    {/* Book Information */}
                     <div className="book-info">
                       <h3>
                         {info.title || "Unknown Title"}
@@ -252,18 +189,22 @@ function App() {
           </>
         )}
 
-        {/* Initial message */}
-        {!loading && !error && books.length === 0 && (
-          <div className="welcome">
-            <div className="welcome-icon">📚</div>
+        {!loading &&
+          !error &&
+          books.length === 0 && (
+            <div className="welcome">
+              <div className="welcome-icon">
+                📚
+              </div>
 
-            <h2>Find Your Next Book</h2>
+              <h2>Find Your Next Book</h2>
 
-            <p>
-              Search for books by title, author, or keyword.
-            </p>
-          </div>
-        )}
+              <p>
+                Enter a title, author, or keyword
+                to search.
+              </p>
+            </div>
+          )}
       </main>
     </div>
   );
